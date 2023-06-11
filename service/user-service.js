@@ -1,4 +1,4 @@
-const userModel = require('../models/user-model');
+const UserModel = require('../models/user-model');
 const bcrypt = require('bcrypt');
 const uuid = require('uuid');
 const mailService = require('./mail-service');
@@ -8,21 +8,14 @@ const ApiError = require('../exceptions/api-error');
 
 class UserService {
   async registration(email, password) {
-    const candidate = await userModel.findOne({ email });
+    const candidate = await UserModel.findOne({ email });
     if (candidate) {
       throw ApiError.BadRequest(`Пользователь с почтовым адресом ${email} уже существует`);
     }
-    const hashPassword = await bcrypt.hash(password, 3);
-    const activationLink = uuid.v4(); //asda-asda-2wsdd-2w-sds
+    const hashPassword = await bcrypt.hash(password, 10);
+    const user = await UserModel.create({ email, password: hashPassword });
 
-    const user = await userModel.create({ email, password: hashPassword, activationLink });
-
-    await mailService.sendActivationMail(
-      email,
-      `${process.env.API_URL}/api/activate/${activationLink}`,
-    );
-
-    const userDto = new UserDto(user); // id, email, isActivated
+    const userDto = new UserDto(user);
     const tokens = tokenService.generateTokens({ ...userDto });
     await tokenService.saveToken(userDto.id, tokens.refreshToken);
     return {
@@ -30,9 +23,32 @@ class UserService {
       user: userDto,
     };
   }
+  // async registration(email, password) {
+  //   const candidate = await UserModel.findOne({ email });
+  //   if (candidate) {
+  //     throw ApiError.BadRequest(`Пользователь с почтовым адресом ${email} уже существует`);
+  //   }
+  //   const hashPassword = await bcrypt.hash(password, 3);
+  //   const activationLink = uuid.v4(); //asda-asda-2wsdd-2w-sds
+
+  //   const user = await UserModel.create({ email, password: hashPassword, activationLink });
+
+  //   await mailService.sendActivationMail(
+  //     email,
+  //     `${process.env.API_URL}/api/activate/${activationLink}`,
+  //   );
+
+  //   const userDto = new UserDto(user); // id, email, isActivated
+  //   const tokens = tokenService.generateTokens({ ...userDto });
+  //   await tokenService.saveToken(userDto.id, tokens.refreshToken);
+  //   return {
+  //     ...tokens,
+  //     user: userDto,
+  //   };
+  // }
 
   async activate(activationLink) {
-    const user = await userModel.findOne({ activationLink });
+    const user = await UserModel.findOne({ activationLink });
     if (!user) {
       throw ApiError.BadRequest('Неккоректная ссылка активации');
     }
@@ -41,7 +57,7 @@ class UserService {
   }
 
   async login(email, password) {
-    const user = await userModel.findOne({ email });
+    const user = await UserModel.findOne({ email });
     if (!user) {
       throw ApiError.BadRequest('Пользователь с таким email не найден');
     }
@@ -73,7 +89,7 @@ class UserService {
       throw ApiError.UnauthorizedError();
     }
 
-    const user = await userModel.findById(userData.id);
+    const user = await UserModel.findById(userData.id);
     const userDto = new UserDto(user);
     const tokens = tokenService.generateTokens({ ...userDto });
 
@@ -86,7 +102,7 @@ class UserService {
 
   //тест функция для авторизированного пользователя
   async getAllUsers() {
-    const users = await userModel.find();
+    const users = await UserModel.find();
     return users;
   }
 }
